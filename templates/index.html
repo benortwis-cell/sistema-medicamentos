@@ -1,5 +1,14 @@
 <!DOCTYPE html>
 <html lang="es">
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="/">WisbenTech Pharma</a>
+        <div class="navbar-nav">
+            <a class="nav-link active" href="/">Inventario / Lotes</a>
+            <a class="nav-link" href="/ventas">Nueva Venta</a>
+        </div>
+    </div>
+</nav>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -36,12 +45,12 @@
             <h3>Inventario Actual</h3>
                 <div class="table-responsive">
                     <table class="table table-hover table-bordered">
-                        <thead class="table-dark">
+                        <thead>
                             <tr>
                                 <th>ID</th>
                                 <th>Nombre</th>
                                 <th>Precio</th>
-                            </tr>
+                                <th>Acciones</th> </tr>
                         </thead>
                         <tbody>
                             {% for med in medicamentos %}
@@ -49,9 +58,12 @@
                                 <td>{{ med[0] }}</td>
                                 <td>{{ med[1] }}</td>
                                 <td>${{ med[2] }}</td>
+                                <td>
+                                    <a href="/eliminar/{{ med[0] }}" class="btn btn-danger btn-sm">Eliminar</a>
+                                </td>
                             </tr>
                             {% endfor %}
-                        </tbody>
+                        </tbody>            
                     </table>
                 </div>
     </div>

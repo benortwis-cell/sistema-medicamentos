@@ -119,26 +119,52 @@ def ventas():
 
 @app.route('/procesar_venta', methods=['POST'])
 def procesar_venta():
-    lote_id = request.form['lote_id']
-    cantidad_venta = int(request.form['cantidad'])
+    # Obtenemos el ID del producto (ahora la venta es por producto, no por un lote fijo)
+    # Nota: Asegúrate de que el select en tu HTML envíe el producto_id
+    producto_id = request.form['lote_id'] 
+    cantidad_a_vender = int(request.form['cantidad'])
 
     conexion = conectar_db()
     cursor = conexion.cursor()
 
-    # 1. Verificamos stock actual del lote seleccionado
-    cursor.execute('SELECT stock FROM lotes WHERE id = ?', (lote_id,))
-    stock_actual = cursor.fetchone()[0]
+    # 1. Buscamos TODOS los lotes de ese medicamento que tengan stock
+    # Los ordenamos por fecha de vencimiento (PEPS) para minimizar pérdidas
+    query = """
+        SELECT id, stock FROM lotes 
+        WHERE producto_id = (SELECT producto_id FROM lotes WHERE id = ?) 
+        AND stock > 0 
+        ORDER BY fecha_vence ASC
+    """
+    cursor.execute(query, (producto_id,))
+    lotes = cursor.fetchall()
 
-    if stock_actual >= cantidad_venta:
-        # 2. Restamos la cantidad
-        nuevo_stock = stock_actual - cantidad_venta
-        cursor.execute('UPDATE lotes SET stock = ? WHERE id = ?', (nuevo_stock, lote_id))
+    # Calculamos el total disponible sumando todos los lotes
+    total_disponible = sum(lote[1] for lote in lotes)
+
+    # Solo procedemos si el total de TODOS los lotes cubre la venta
+    if total_disponible >= cantidad_a_vender:
+        for lote_id, stock_lote in lotes:
+            if cantidad_a_vender <= 0:
+                break
+            
+            if stock_lote <= cantidad_a_vender:
+                # Caso A: El lote no alcanza para cubrir todo, lo agotamos y seguimos al siguiente
+                cantidad_a_vender -= stock_lote
+                cursor.execute("UPDATE lotes SET stock = 0 WHERE id = ?", (lote_id,))
+            else:
+                # Caso B: El lote tiene suficiente para cubrir lo que falta de la venta
+                nuevo_stock = stock_lote - cantidad_a_vender
+                cursor.execute("UPDATE lotes SET stock = ? WHERE id = ?", (nuevo_stock, lote_id))
+                cantidad_a_vender = 0
         
-        # 3. Registramos la venta para el historial (Análisis de datos)
-        cursor.execute('INSERT INTO ventas (total) VALUES (0)') # Por ahora total 0
-        
+        # Registramos el movimiento en la tabla de ventas para tu análisis
+        cursor.execute('INSERT INTO ventas (total) VALUES (?)', (0,)) # Puedes calcular el total después
         conexion.commit()
-    
+    else:
+        # Aquí puedes retornar un mensaje de error si ni sumando todos los lotes alcanza
+        conexion.close()
+        return "<h1>Error: Stock insuficiente en todos los lotes combinados</h1><a href='/ventas'>Volver</a>"
+
     conexion.close()
     return redirect('/')
 

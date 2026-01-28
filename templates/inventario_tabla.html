@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+    {% block content %}
+        <section class="card shadow mb-4">
+            <div class="card-body">
+                <h2 class="card-title">Registrar Entrada de Lote</h2>
+                <form action="/agregar" method="POST" class="row g-3">
+                    <div class="col-md-6">
+                        <label class="form-label">Medicamento</label>
+                        <input type="text" name="nombre" class="form-control" placeholder="Ej: Amoxicilina" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Lote #</label>
+                        <input type="text" name="lote" class="form-control" required>
+                    </div>
+                    <div class="col-md-3">
+                        <label class="form-label">Vencimiento</label>
+                        <input type="date" name="vencimiento" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Cantidad Inicial</label>
+                        <input type="number" name="cantidad" class="form-control" required>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label">Precio al Público</label>
+                        <input type="number" step="0.01" name="precio" class="form-control" required>
+                    </div>
+                    <div class="col-12 text-end">
+                        <button type="submit" class="btn btn-success">Guardar en Inventario</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <section>
+            <h3 class="mb-3">Stock Actual por Lotes</h3>
+            <div class="table-responsive">
+                <table class="table table-hover table-bordered bg-white shadow-sm">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Medicamento</th>
+                            <th>Lote #</th>
+                            <th>Stock</th>
+                            <th>Vencimiento</th>
+                            <th>Precio</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for med in medicamentos %}
+                        <tr class="{% if fecha_actual and med[4] < fecha_actual %}table-danger{% endif %}">
+                            <td>{{ med[0] }}</td>
+                            <td>{{ med[1] }}</td>
+                            <td>{{ med[2] }}</td>
+                            <td>{{ med[3] }}</td>
+                            <td>{{ med[4] }}</td>
+                            <td>${{ med[5] }}</td>
+                            <td>
+                                <a href="/eliminar/{{ med[0] }}" class="btn btn-danger btn-sm">Eliminar</a>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </section>
+        {% endblock %}

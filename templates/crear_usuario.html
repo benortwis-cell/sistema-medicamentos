@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+    {% block content %} 
+        <div class="row justify-content-center">
+            <div class="col-md-6">
+                <section class="card shadow">
+                    <div class="card-body">
+                        <h2 class="card-title mb-4">Registrar Nuevo Personal</h2>
+                        
+                        <form action="/crear_usuario" method="POST">
+                            <div class="mb-3">
+                                <label class="form-label">Nombre de Usuario</label>
+                                <input type="text" name="username" class="form-control" required placeholder="Ej: juancito_ventas">
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label class="form-label">Contraseña</label>
+                                <input type="password" name="password" class="form-control" required>
+                                <div class="form-text">Usa una clave segura que el trabajador deba cambiar luego.</div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label">Rol del Usuario</label>
+                                <select name="rol" class="form-select" required>
+                                    <option value="vendedor" selected>Vendedor (Solo ventas)</option>
+                                    <option value="admin">Administrador (Acceso total)</option>
+                                </select>
+                            </div>
+
+                            <div class="d-grid gap-2">
+                                <button type="submit" class="btn btn-primary btn-lg">Crear Cuenta</button>
+                                <a href="/" class="btn btn-outline-secondary">Cancelar</a>
+                            </div>
+                        </form>
+                    </div>
+                </section>
+            </div>
+        </div>
+    {% endblock %}

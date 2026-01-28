@@ -1,93 +1,52 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>WisbenTech - Control de Medicamentos</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-</head>
-<body class="bg-light">
-    <!-- Barra de Navegación -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="/">WisbenTech Pharma</a>
-            <div class="navbar-nav">
-                <a class="nav-link active" href="/">Inventario / Lotes</a>
-                <a class="nav-link" href="/ventas">Nueva Venta</a>
-            </div>
+{% extends "base.html" %}
+    {% block content %}
+        <div class="text-center mb-5">
+            <h1 class="display-4">Sistema de Gestión Farmacéutica</h1>
+            <p class="lead">Seleccione una opción del menú según su perfil</p>
         </div>
-    </nav>
 
-    <main class="container">
-        <!-- Formulario de Registro -->
-        <section class="card shadow mb-4">
-            <div class="card-body">
-                <h2 class="card-title">Registrar Medicamento</h2>
-                <form action="/agregar" method="POST" class="row g-3">
-                    <div class="col-md-6">
-                        <label class="form-label">Medicamento</label>
-                        <input type="text" name="nombre" class="form-control" placeholder="Ej: Amoxicilina" required>
+        <div class="row g-4 justify-content-center">
+            
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-primary text-center">
+                    <div class="card-body">
+                        <i class="bi bi-cart4 display-1 text-primary"></i>
+                        <h3 class="card-title mt-3">Ventas</h3>
+                        <p class="card-text">Procesar nuevas ventas y salida de medicamentos.</p>
+                        <a href="/ventas" class="btn btn-primary w-100">Ir a Ventas</a>
                     </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Lote #</label>
-                        <input type="text" name="lote" class="form-control" required>
-                    </div>
-                    <div class="col-md-3">
-                        <label class="form-label">Vencimiento</label>
-                        <input type="date" name="vencimiento" class="form-control" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Cantidad Inicial</label>
-                        <input type="number" name="cantidad" class="form-control" required>
-                    </div>
-                    <div class="col-md-4">
-                        <label class="form-label">Precio al Público</label>
-                        <div class="input-group">
-                            <span class="input-group-text">$</span>
-                            <input type="number" step="0.01" name="precio" class="form-control" required>
-                        </div>
-                    </div>
-                    <div class="col-12 text-end">
-                        <button type="submit" class="btn btn-primary">Registrar Entrada de Stock</button>
-                    </div>
-                </form>
+                </div>
             </div>
-        </section>
 
-        <!-- Tabla de Inventario -->
-        <section>
-            <h3 class="mb-3">Inventario Actual</h3>
-            <div class="table-responsive">
-                <table class="table table-hover table-bordered bg-white shadow-sm">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>ID</th>
-                            <th>Medicamento</th>
-                            <th>Lote #</th>
-                            <th>Stock</th>
-                            <th>Vencimiento</th>
-                            <th>Precio</th>
-                            <th>Acciones</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for med in medicamentos %}
-                        <tr>
-                            <td>{{ med[0] }}</td>
-                            <td>{{ med[1] }}</td>
-                            <td><span class="badge bg-secondary">{{ med[2] }}</span></td>
-                            <td>{{ med[3] }}</td>
-                            <td>{{ med[4] }}</td>
-                            <td><strong>${{ med[5] }}</strong></td>
-                            <td>
-                                <a href="/eliminar/{{ med[0] }}" class="btn btn-danger btn-sm">Eliminar</a>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+            {% if session['rol'] == 'admin' %}
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-success text-center">
+                    <div class="card-body">
+                        <i class="bi bi-box-seam display-1 text-success"></i>
+                        <h3 class="card-title mt-3">Inventario</h3>
+                        <p class="card-text">Carga de stock, gestión de lotes y eliminación.</p>
+                        <a href="/gestion_inventario" class="btn btn-success w-100">Gestionar Stock</a>
+                    </div>
+                </div>
             </div>
-        </section>
-    </main>
-</body>
-</html>
+
+            <div class="col-md-4">
+                <div class="card h-100 shadow-sm border-warning text-center">
+                    <div class="card-body">
+                        <i class="bi bi-people display-1 text-warning"></i>
+                        <h3 class="card-title mt-3">Usuarios</h3>
+                        <p class="card-text">Administrar personal, roles y accesos.</p>
+                        <a href="/crear_usuario" class="btn btn-warning w-100">Gestionar Usuarios</a>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+        </div>
+
+        <div class="text-center mt-5">
+            <a href="/logout" class="btn btn-outline-danger">
+                <i class="bi bi-box-arrow-right"></i> Cerrar Sesión Segura
+            </a>
+        </div>
+    {% endblock %}

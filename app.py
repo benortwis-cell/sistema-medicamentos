@@ -284,51 +284,30 @@ def ventas():
     conexion.close()
     return render_template('ventas.html', lotes=lotes_disponibles)
 
-@app.route('/procesar_venta', methods=['POST'])
+
+@app.route('/agregar_al_carrito', methods=['POST'])
 @login_requerido
-def procesar_venta():
-    # ... (Captura de datos del formulario) ...
-    lote_id = request.form['lote_id']
-    cantidad = int(request.form['cantidad'])
+def agregar_al_carrito():
+    if 'carrito' not in session:
+        session['carrito'] = []
     
-    conexion = conectar_db()
-    cursor = conexion.cursor()
-    
-    # 1. Obtenemos precio y si el producto es afecto al IGV
-    query = """
-        SELECT l.precio, p.afecto_igv, p.nombre 
-        FROM lotes l 
-        JOIN productos p ON l.producto_id = p.id 
-        WHERE l.id = ?
-    """
-    cursor.execute(query, (lote_id,))
-    lote_info = cursor.fetchone()
-    
-    precio_unitario = lote_info[0]
-    es_afecto = lote_info[1]
-    
-    # 2. Cálculos matemáticos
-    # Si el precio ya incluye IGV, desglosamos: Subtotal = Total / 1.18
-    # Si el precio es base, sumamos: Total = Subtotal * 1.18
-    # Usaremos la lógica de "Precio de lista ya incluye IGV" (Común en farmacias)
-    
-    total_item = precio_unitario * cantidad
-    
-    if es_afecto == 1:
-        # Desglose de impuestos (18%)
-        subtotal = total_item / 1.18
-        igv_calculado = total_item - subtotal
-    else:
-        # Producto exonerado o inafecto
-        subtotal = total_item
-        igv_calculado = 0.0
+    if len(session['carrito']) >= 50:
+        return "Límite de 50 ítems alcanzado."
 
-    # ... (Aquí seguiría la lógica de insertar en tablas 'ventas' y 'detalle_ventas') ...
+    # Capturamos el ítem actual
+    item = {
+        'lote_id': request.form['lote_id'],
+        'nombre': request.form['nombre_mostrar'], # Lo pasaremos desde el HTML
+        'cantidad': int(request.form['cantidad']),
+        'precio': float(request.form['precio_unitario'])
+    }
     
-    conexion.commit()
-    conexion.close()
+    # Actualizamos la sesión de forma segura
+    carrito = session['carrito']
+    carrito.append(item)
+    session['carrito'] = carrito
+    
     return redirect('/ventas')
-
 if __name__ == '__main__':
     inicializar_tablas()
     app.run(debug=True)

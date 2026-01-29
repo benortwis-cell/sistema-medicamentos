@@ -73,14 +73,14 @@ def inicializar_tablas():
             tipo_cliente TEXT NOT NULL -- 'Natural' o 'Juridica'
         )
     ''')
-
-    # Tabla de Ventas (Cabecera)
+    
+    # Tabla de Ventas (Cabecera Unificada)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS ventas (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             cliente_id INTEGER,
             usuario_id INTEGER,
-            tipo_documento TEXT, -- 'Boleta' o 'Factura'
+            tipo_documento TEXT,
             fecha_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             subtotal REAL,
             igv_total REAL,
@@ -89,6 +89,12 @@ def inicializar_tablas():
             FOREIGN KEY (usuario_id) REFERENCES usuarios (id)
         )
     ''')
+
+    # PARCHE DE SEGURIDAD: Intentar añadir cliente_id si la tabla se creó con la versión vieja
+    try:
+        cursor.execute('ALTER TABLE ventas ADD COLUMN cliente_id INTEGER')
+    except:
+        pass # La columna ya existe
 
     # Tabla Detalle de Venta (Para registrar qué productos van en cada boleta/factura)
     cursor.execute('''
@@ -113,9 +119,6 @@ def inicializar_tablas():
             rol TEXT NOT NULL 
         )
     ''')
-    
-    # Tabla de Ventas para historial
-    cursor.execute('CREATE TABLE IF NOT EXISTS ventas (id INTEGER PRIMARY KEY AUTOINCREMENT, fecha TIMESTAMP DEFAULT CURRENT_TIMESTAMP, total REAL)')
     
     # Creamos un admin por defecto si la tabla está vacía (Pass: admin123)
     cursor.execute('SELECT COUNT(*) FROM usuarios')
@@ -273,7 +276,7 @@ def ventas():
     conexion = conectar_db()
     cursor = conexion.cursor()
     query = '''
-        SELECT l.id, p.nombre, l.codigo_lote, l.stock, l.fecha_vence 
+        SELECT l.id, p.nombre, l.codigo_lote, l.stock, l.fecha_vence, l.precio
         FROM lotes l
         JOIN productos p ON l.producto_id = p.id
         WHERE l.stock > 0
@@ -284,13 +287,6 @@ def ventas():
     conexion.close()
     return render_template('ventas.html', lotes=lotes_disponibles)
 
-
-@app.route('/ventas')
-@login_requerido
-def vista_ventas():
-    # ... lógica para cargar lotes disponibles ...
-    return render_template('ventas.html', lotes=lista_lotes)
-
 # AGREGAR AQUÍ: Gestión del carrito temporal
 @app.route('/agregar_al_carrito', methods=['POST'])
 @login_requerido
@@ -298,24 +294,29 @@ def agregar_al_carrito():
     if 'carrito' not in session:
         session['carrito'] = []
 
-    # Captura segura con conversión explícita
+    # Recibimos los datos y forzamos el tipo de dato
+    lote_id = request.form.get('lote_id')
+    nombre = request.form.get('nombre_mostrar')
+    
+    # Aquí estaba el fallo: forzamos int para cantidad y float para precio
     try:
-        precio_unitario = float(request.form.get('precio_unitario', 0))
         cantidad = int(request.form.get('cantidad', 1))
+        precio = float(request.form.get('precio_unitario', 0.0))
     except (ValueError, TypeError):
-        precio_unitario = 0.0
         cantidad = 1
+        precio = 0.0
 
     item = {
-        'lote_id': request.form.get('lote_id'),
-        'nombre': request.form.get('nombre_mostrar', 'Sin nombre'),
+        'lote_id': lote_id,
+        'nombre': nombre,
         'cantidad': cantidad,
-        'precio': precio_unitario
+        'precio': precio
     }
     
     carrito = session['carrito']
     carrito.append(item)
     session['carrito'] = carrito
+    
     return redirect('/ventas')
 
 # Ubicación: app.py, después de la ruta de agregar_al_carrito

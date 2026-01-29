@@ -7,7 +7,7 @@
                 <h5 class="mb-0"><i class="bi bi-cart-plus"></i> Añadir Producto</h5>
             </div>
             <div class="card-body">
-                <form action="/agregar_al_carrito" method="POST">
+                <form action="/agregar_al_carrito" method="POST" id="formVenta">
                     <div class="mb-3">
                         <label class="form-label font-weight-bold">Producto en Stock</label>
                         <select name="lote_id" id="loteSelect" class="form-select" required onchange="actualizarDatos()">
@@ -25,7 +25,7 @@
 
                     <div class="mb-3">
                         <label class="form-label font-weight-bold">Cantidad</label>
-                        <input type="number" name="cantidad" class="form-control" min="1" value="1" required>
+                        <input type="number" name="cantidad" id="inputCantidad" class="form-control" min="1" value="1" required>
                     </div>
 
                     <div class="d-grid">
@@ -34,6 +34,8 @@
                         </button>
                     </div>
                 </form>
+
+
             </div>
         </div>
     </div>
@@ -41,19 +43,19 @@
     <div class="col-md-8">
         <form action="/procesar_venta" method="POST">
             <div class="card shadow p-3 mb-3 border-0">
-                <h5 class="text-muted"><i class="bi bi-person-badge"></i> Datos del Cliente y Comprobante</h5>
+                <h5 class="text-muted"><i class="bi bi-person-badge"></i> Datos del Cliente</h5>
                 <div class="row g-2">
-                    <div class="col-md-6">
+                    <div class="col-md-4">
                         <input type="text" name="doc_identidad" class="form-control" placeholder="DNI o RUC" required>
                     </div>
-                    <div class="col-md-6">
-                        <select name="tipo_comprobante" class="form-select" required>
-                            <option value="Boleta">Boleta (DNI/RUC 10)</option>
-                            <option value="Factura">Factura (RUC 20/10)</option>
-                        </select>
+                    <div class="col-md-5">
+                        <input type="text" name="nombre_cliente" class="form-control" placeholder="Nombre/Razón Social" required>
                     </div>
-                    <div class="col-12 mt-2">
-                        <input type="text" name="nombre_cliente" class="form-control" placeholder="Nombre o Razón Social" required>
+                    <div class="col-md-3">
+                        <select name="tipo_comprobante" class="form-select">
+                            <option value="Boleta">Boleta</option>
+                            <option value="Factura">Factura</option>
+                        </select>
                     </div>
                 </div>
             </div>
@@ -70,23 +72,23 @@
                                 <th>Producto</th>
                                 <th class="text-center">Cant.</th>
                                 <th class="text-end">P. Unitario</th>
-                                <th class="text-end">Subtotal (Item)</th>
+                                <th class="text-end">Subtotal</th>
                             </tr>
                         </thead>
                         <tbody>
                             {% set vars = {'total_general': 0} %}
                             {% for item in session.get('carrito', []) %}
-                                {% set subtotal_item = item.precio * item.cantidad %}
+                                {% set subtotal_item = (item.precio | float) * (item.cantidad | int) %}
                                 {% if vars.update({'total_general': vars.total_general + subtotal_item}) %} {% endif %}
                                 <tr>
                                     <td>{{ item.nombre }}</td>
                                     <td class="text-center">{{ item.cantidad }}</td>
-                                    <td class="text-end">S/ {{ "%.2f"|format(item.precio) }}</td>
+                                    <td class="text-end">S/ {{ "%.2f"|format(item.precio | float) }}</td>
                                     <td class="text-end">S/ {{ "%.2f"|format(subtotal_item) }}</td>
                                 </tr>
                             {% else %}
                                 <tr>
-                                    <td colspan="4" class="text-center text-muted py-4">No hay productos en la lista</td>
+                                    <td colspan="4" class="text-center text-muted py-4">Carrito vacío</td>
                                 </tr>
                             {% endfor %}
                         </tbody>
@@ -94,22 +96,16 @@
                 </div>
 
                 <div class="card-footer bg-light border-top-0">
-                    <div class="row justify-content-end">
-                        <div class="col-md-5">
-                            <div class="d-flex justify-content-between mb-1">
-                                <span class="text-muted">Subtotal (Suma de items):</span>
-                                {% set gravada = vars.total_general / 1.18 %}
-                                <span class="font-weight-bold">S/ {{ "%.2f"|format(gravada) }}</span>
-                            </div>
-                            <div class="d-flex justify-content-between mb-1">
-                                <span class="text-muted">IGV (18%):</span>
-                                <span class="font-weight-bold">S/ {{ "%.2f"|format(vars.total_general - gravada) }}</span>
-                            </div>
+                    <div class="row justify-content-end text-end">
+                        <div class="col-md-6">
+                            {% set gravada = vars.total_general / 1.18 %}
+                            <p class="mb-1">Subtotal (Base Imponible): <strong>S/ {{ "%.2f"|format(gravada) }}</strong></p>
+                            <p class="mb-1">IGV (18%): <strong>S/ {{ "%.2f"|format(vars.total_general - gravada) }}</strong></p>
                             <hr>
-                            <div class="d-flex justify-content-between">
-                                <span class="h5">Total a Pagar:</span>
-                                <span class="h5 text-primary">S/ {{ "%.2f"|format(vars.total_general) }}</span>
-                            </div>
+                            <h4 class="text-primary">Total a Pagar: S/ {{ "%.2f"|format(vars.total_general) }}</h4>
+                            <button type="submit" class="btn btn-success btn-lg w-100 mt-2" {% if not session.get('carrito') %}disabled{% endif %}>
+                                Confirmar Venta
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -118,16 +114,23 @@
     </div>
 </div>
 
+
+// Función única y optimizada
 <script>
 function actualizarDatos() {
     const select = document.getElementById('loteSelect');
     const option = select.options[select.selectedIndex];
     
+    // Captura de datos
     const nombre = option.getAttribute('data-nombre');
     const precio = option.getAttribute('data-precio');
 
-    document.getElementById('inputNombre').value = nombre || "";
-    document.getElementById('inputPrecio').value = precio || "0.0";
+    // Inyección en el DOM
+    document.getElementById('inputNombre').value = nombre;
+    document.getElementById('inputPrecio').value = precio;
+
+    // Validación en consola para tu Mac (Cmd + Opt + J para verla)
+    console.log("Ingeniería Wisben - Producto:", nombre, "| Precio detectado:", precio);
 }
 </script>
 {% endblock %}

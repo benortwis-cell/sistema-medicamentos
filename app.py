@@ -285,29 +285,110 @@ def ventas():
     return render_template('ventas.html', lotes=lotes_disponibles)
 
 
+@app.route('/ventas')
+@login_requerido
+def vista_ventas():
+    # ... lógica para cargar lotes disponibles ...
+    return render_template('ventas.html', lotes=lista_lotes)
+
+# AGREGAR AQUÍ: Gestión del carrito temporal
 @app.route('/agregar_al_carrito', methods=['POST'])
 @login_requerido
 def agregar_al_carrito():
     if 'carrito' not in session:
         session['carrito'] = []
-    
-    if len(session['carrito']) >= 50:
-        return "Límite de 50 ítems alcanzado."
 
-    # Capturamos el ítem actual
+    # Captura segura con conversión explícita
+    try:
+        precio_unitario = float(request.form.get('precio_unitario', 0))
+        cantidad = int(request.form.get('cantidad', 1))
+    except (ValueError, TypeError):
+        precio_unitario = 0.0
+        cantidad = 1
+
     item = {
-        'lote_id': request.form['lote_id'],
-        'nombre': request.form['nombre_mostrar'], # Lo pasaremos desde el HTML
-        'cantidad': int(request.form['cantidad']),
-        'precio': float(request.form['precio_unitario'])
+        'lote_id': request.form.get('lote_id'),
+        'nombre': request.form.get('nombre_mostrar', 'Sin nombre'),
+        'cantidad': cantidad,
+        'precio': precio_unitario
     }
     
-    # Actualizamos la sesión de forma segura
     carrito = session['carrito']
     carrito.append(item)
     session['carrito'] = carrito
-    
     return redirect('/ventas')
+
+# Ubicación: app.py, después de la ruta de agregar_al_carrito
+@app.route('/limpiar_carrito')
+@login_requerido
+def limpiar_carrito():
+    # Elimina la lista 'carrito' de la sesión del usuario
+    session.pop('carrito', None)
+    # Redirige de vuelta a la interfaz de ventas
+    return redirect('/ventas')
+
+@app.route('/procesar_venta', methods=['POST'])
+@login_requerido
+def procesar_venta():
+    carrito = session.get('carrito', [])
+    if not carrito:
+        return "El carrito está vacío", 400
+
+    # 1. Capturar datos del cliente y comprobante
+    doc_cliente = request.form.get('doc_identidad')
+    nombre_cliente = request.form.get('nombre_cliente')
+    tipo_comprobante = request.form.get('tipo_comprobante') # 'Boleta' o 'Factura'
+    
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    
+    try:
+        # 2. Registrar/Actualizar Cliente
+        cursor.execute('''
+            INSERT INTO clientes (nombre_razon_social, documento_identidad, tipo_cliente) 
+            VALUES (?, ?, ?)
+            ON CONFLICT(documento_identidad) DO UPDATE SET nombre_razon_social=excluded.nombre_razon_social
+        ''', (nombre_cliente, doc_cliente, tipo_comprobante))
+        
+        cursor.execute('SELECT id FROM clientes WHERE documento_identidad = ?', (doc_cliente,))
+        cliente_id = cursor.fetchone()[0]
+
+        # 3. Calcular Totales e IGV
+        total_venta = sum(item['precio'] * item['cantidad'] for item in carrito)
+        # Lógica: El precio de lista ya incluye IGV (18%)
+        subtotal_venta = total_venta / 1.18
+        igv_total = total_venta - subtotal_venta
+
+        # 4. Insertar Cabecera de Venta
+        cursor.execute('''
+            INSERT INTO ventas (cliente_id, usuario_id, tipo_documento, subtotal, igv_total, total)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (cliente_id, session['usuario_id'], tipo_comprobante, subtotal_venta, igv_total, total_venta))
+        
+        venta_id = cursor.lastrowid
+
+        # 5. Procesar cada ítem del carrito (Detalle y Stock)
+        for item in carrito:
+            # Insertar detalle
+            subtotal_item = item['precio'] * item['cantidad']
+            cursor.execute('''
+                INSERT INTO detalle_ventas (venta_id, lote_id, cantidad, precio_unitario, subtotal_item)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (venta_id, item['lote_id'], item['cantidad'], item['precio'], subtotal_item))
+
+            # DESCUENTO DE STOCK: Restar la cantidad vendida del lote
+            cursor.execute('UPDATE lotes SET stock = stock - ? WHERE id = ?', (item['cantidad'], item['lote_id']))
+
+        conexion.commit()
+        session.pop('carrito', None) # Limpiar carrito tras éxito
+        return redirect('/ventas')
+
+    except Exception as e:
+        conexion.rollback()
+        return f"Error al procesar la venta: {str(e)}", 500
+    finally:
+        conexion.close()
+
 if __name__ == '__main__':
     inicializar_tablas()
     app.run(debug=True)

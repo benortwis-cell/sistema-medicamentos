@@ -228,33 +228,104 @@ def gestion_inventario():
     hoy = date.today().strftime('%Y-%m-%d')
     return render_template('inventario_tabla.html', medicamentos=lista_lotes, fecha_actual=hoy)
 
+
+#Agregar medicamento al inventario desde el formulario 1 x 1 
 @app.route('/agregar', methods=['POST'])
 @login_requerido
 def agregar():
     if session.get('rol') != 'admin':
-        return "Acceso denegado: Solo administradores pueden cargar stock."
+        return "Acceso denegado"
     
+    # Captura de datos del formulario
     nombre = request.form['nombre'].strip().upper()
     codigo_lote = request.form['lote']
     cantidad = request.form['cantidad']
     vencimiento = request.form['vencimiento']
     precio = request.form['precio']
+    # Si es un checkbox, Flask recibe '1' si está marcado, o None si no.
+    afecto_igv = 1 if request.form.get('afecto_igv') else 0
 
     conexion = conectar_db()
     cursor = conexion.cursor()
-    cursor.execute('INSERT OR IGNORE INTO productos (nombre) VALUES (?)', (nombre,))
-    cursor.execute('SELECT id FROM productos WHERE nombre = ?', (nombre,))
-    producto_id = cursor.fetchone()[0]
-    
+
+
+    # 1. Insertar/Actualizar el producto con su estado de IGV
     cursor.execute('''
-        INSERT INTO lotes (producto_id, codigo_lote, stock, fecha_vence, precio) 
-        VALUES (?, ?, ?, ?, ?)''', 
-        (producto_id, codigo_lote, cantidad, vencimiento, precio))
-    
+        INSERT INTO productos (nombre, afecto_igv) 
+        VALUES (?, ?) 
+        ON CONFLICT(nombre) DO UPDATE SET afecto_igv=excluded.afecto_igv
+    ''', (nombre.upper(), afecto_igv))
+
+    # 2. Obtener el ID del producto recién insertado o existente
+    cursor.execute('SELECT id FROM productos WHERE nombre = ?', (nombre.upper(),))
+    producto_id = cursor.fetchone()[0]
+
+    # 3. Insertar el nuevo lote asociado al producto
+    cursor.execute('''
+        INSERT INTO lotes (producto_id, codigo_lote, stock, fecha_vence, precio)
+        VALUES (?, ?, ?, ?, ?)
+    ''', (producto_id, codigo_lote, int(cantidad), vencimiento, float(precio)))     
+
+
     conexion.commit()
     conexion.close()
     return redirect('/gestion_inventario')
 
+# Necesitamos una ruta que lea el archivo, separe las columnas y haga el doble insert: primero en productos (si no existe) y luego en lotes
+@app.route('/importar_stock', methods=['POST'])
+@login_requerido
+def importar_stock():
+    if session.get('rol') != 'admin':
+        return "Acceso denegado"
+        
+    archivo = request.files.get('archivo_txt')
+    if not archivo or archivo.filename == '':
+        return redirect('/gestion_inventario')
+
+    conexion = conectar_db()
+    cursor = conexion.cursor()
+    
+    try:
+        # Leemos el contenido y lo decodificamos de forma simple
+        contenido = archivo.read().decode('utf-8').strip().splitlines()
+        print(f"DEBUG: Se leyeron {len(contenido)} líneas del archivo.")
+
+        for num_linea, linea in enumerate(contenido, 1):
+            linea = linea.strip()
+            # Ignoramos líneas vacías o restos de formato RTF
+            if not linea or linea.startswith('{') or linea.startswith('\\'):
+                continue
+            
+            datos = [d.strip() for d in linea.split(',')]
+            
+            if len(datos) < 5:
+                print(f"Línea {num_linea} saltada por falta de datos: {linea}")
+                continue
+            
+            nombre, lote, stock, vence, precio = datos
+
+            # 1. Insertar Producto
+            cursor.execute('INSERT OR IGNORE INTO productos (nombre) VALUES (?)', (nombre.upper(),))
+            cursor.execute('SELECT id FROM productos WHERE nombre = ?', (nombre.upper(),))
+            producto_id = cursor.fetchone()[0]
+
+            # 2. Insertar Lote
+            cursor.execute('''
+                INSERT INTO lotes (producto_id, codigo_lote, stock, fecha_vence, precio)
+                VALUES (?, ?, ?, ?, ?)
+            ''', (producto_id, lote, int(stock), vence, float(precio)))
+
+        conexion.commit()
+        print("IMPORTACIÓN EXITOSA")
+        
+    except Exception as e:
+        conexion.rollback()
+        print(f"ERROR EN IMPORTACIÓN (Línea {num_linea}): {str(e)}")
+    finally:
+        conexion.close()
+    
+    return redirect('/gestion_inventario')
+    
 @app.route('/eliminar/<int:id>')
 @login_requerido
 def eliminar(id):
@@ -267,6 +338,7 @@ def eliminar(id):
     conexion.commit()
     conexion.close()
     return redirect('/gestion_inventario')
+
 
 # --- RUTAS DE VENTAS (Admin y Vendedor) ---
 

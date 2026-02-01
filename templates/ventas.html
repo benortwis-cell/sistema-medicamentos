@@ -9,15 +9,25 @@
             <div class="card-body">
                 <form action="/agregar_al_carrito" method="POST" id="formVenta">
                     <div class="mb-3">
-                        <label class="form-label font-weight-bold">Producto en Stock</label>
-                        <select name="lote_id" id="loteSelect" class="form-select" required onchange="actualizarDatos()">
-                            <option value="" selected disabled>Elija un medicamento...</option>
-                            {% for lote in lotes %}
-                            <option value="{{ lote[0] }}" data-nombre="{{ lote[1] }}" data-precio="{{ lote[5] }}">
-                                {{ lote[1] }} (Stock: {{ lote[3] }})
-                            </option>
-                            {% endfor %}
-                        </select>
+                        <label for="lote_id" class="form-label">Buscar Medicamento:</label>
+                        <input type="hidden" name="nombre_mostrar" id="nombre_oculto">
+                            <select id="buscador-medicamentos" name="lote_id" required>
+                                <option value="">Seleccione...</option>
+                                {% for lote in lotes %}
+                                    <option value="{{ lote[0] }}">{{ lote[1] }}</option>
+                                {% endfor %}
+                            </select>
+
+                            <script>
+                                var ts = new TomSelect("#buscador-medicamentos", {
+                                    onChange: function(value) {
+                                        // Obtenemos el texto de la opción seleccionada y lo ponemos en el campo oculto
+                                        var control = this;
+                                        var text = control.getItem(value).innerText;
+                                        document.getElementById('nombre_oculto').value = text;
+                                    }
+                                });
+                            </script>
                     </div>
 
                     <input type="hidden" name="nombre_mostrar" id="inputNombre">
